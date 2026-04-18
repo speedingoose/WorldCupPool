@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const GROUP_KEYS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
+import { validateAndSanitize } from "@/lib/validation";
+import { checkRateLimit, pruneRateLimitStore } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
+  // IP-based rate limiting.
+  // On Vercel, x-forwarded-for is always injected by the platform, so this
+  // reliably identifies the originating client.
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    req.headers.get("x-real-ip");
+
+  if (!ip) {
+    // Cannot identify the client – reject to prevent rate-limit bypass.
+    return NextResponse.json({ error: "Unable to process request" }, { status: 400 });
+  }
+
+  // Periodically evict stale entries to keep the in-memory store bounded.
+  pruneRateLimitStore();
+
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -10,60 +29,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name, email, groups, thirdPlaceAdvances } = body as Record<string, unknown>;
-
-  // Validate name
-  if (!name || typeof name !== "string" || !name.trim()) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  const result = validateAndSanitize(body);
+  if (!result.ok) {
+    console.warn("[submit] Validation failed:", result.serverLog);
+    return NextResponse.json({ error: result.clientError }, { status: 400 });
   }
 
-  // Validate groups
-  if (!groups || typeof groups !== "object" || Array.isArray(groups)) {
-    return NextResponse.json({ error: "Groups are required" }, { status: 400 });
-  }
-  const groupsObj = groups as Record<string, unknown>;
-  for (const key of GROUP_KEYS) {
-    if (!Array.isArray(groupsObj[key])) {
-      return NextResponse.json({ error: `Group ${key} is missing` }, { status: 400 });
-    }
-    const teams = groupsObj[key] as unknown[];
-    if (teams.length !== 4) {
-      return NextResponse.json({ error: `Group ${key} must have exactly 4 teams` }, { status: 400 });
-    }
-    const unique = new Set(teams);
-    if (unique.size !== 4) {
-      return NextResponse.json({ error: `Group ${key} must have 4 unique teams` }, { status: 400 });
-    }
-  }
+  const { name, email, groups, thirdPlaceAdvances } = result.payload;
 
-  // Validate thirdPlaceAdvances
-  if (!thirdPlaceAdvances || typeof thirdPlaceAdvances !== "object" || Array.isArray(thirdPlaceAdvances)) {
-    return NextResponse.json({ error: "thirdPlaceAdvances is required" }, { status: 400 });
-  }
-  const tpaObj = thirdPlaceAdvances as Record<string, unknown>;
-  for (const key of GROUP_KEYS) {
-    if (typeof tpaObj[key] !== "boolean") {
-      return NextResponse.json({ error: `thirdPlaceAdvances.${key} is missing` }, { status: 400 });
-    }
-  }
-  const trueCount = GROUP_KEYS.filter((k) => tpaObj[k] === true).length;
-  if (trueCount !== 8) {
-    return NextResponse.json({ error: "Exactly 8 third-place teams must advance" }, { status: 400 });
-  }
-
-  // Build forwarded payload
+  // Build forwarded payload – secret is added server-side only
   const payload = {
-    name: (name as string).trim(),
-    email: typeof email === "string" && email.trim() ? email.trim() : undefined,
-    groups: groupsObj,
-    thirdPlaceAdvances: tpaObj,
+    name,
+    email,
+    groups,
+    thirdPlaceAdvances,
     submittedAt: new Date().toISOString(),
     secret: process.env.SUBMISSION_SECRET ?? "",
   };
 
   const appsScriptUrl = process.env.APPS_SCRIPT_URL;
   if (!appsScriptUrl) {
-    // If no URL configured, just return success (dev mode)
+    // No URL configured – return success in dev mode
     return NextResponse.json({ ok: true });
   }
 
@@ -74,10 +60,15 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(payload),
     });
     if (!upstream.ok) {
+      console.error("[submit] Upstream responded with status:", upstream.status);
       return NextResponse.json({ error: "Failed to forward submission" }, { status: 502 });
     }
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error(
+      "[submit] Failed to reach upstream:",
+      err instanceof Error ? err.message : "unknown error"
+    );
     return NextResponse.json({ error: "Failed to reach submission server" }, { status: 502 });
   }
 }
