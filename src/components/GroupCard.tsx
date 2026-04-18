@@ -15,6 +15,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { TEAM_FLAGS } from "@/lib/groups";
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th"];
 
@@ -62,7 +63,10 @@ function SortableTeam({
         {ORDINALS[index]}
       </span>
       {/* Team name */}
-      <span className="flex-1 text-sm font-medium text-gray-800">{id}</span>
+      <span className="flex-1 text-sm font-medium text-gray-800">
+        {TEAM_FLAGS[id] && <span className="mr-1">{TEAM_FLAGS[id]}</span>}
+        {id}
+      </span>
       {/* Checkbox only for 3rd place */}
       {isThird && (
         <label className="flex items-center gap-1 cursor-pointer shrink-0">
