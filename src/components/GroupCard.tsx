@@ -1,63 +1,30 @@
 "use client";
 
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { TEAM_FLAGS } from "@/lib/groups";
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th"];
 
-function SortableTeam({
+function TeamRow({
   id,
   index,
+  total,
   isThird,
   isSelected,
   onToggle,
+  onMoveUp,
+  onMoveDown,
 }: {
   id: string;
   index: number;
+  total: number;
   isThird: boolean;
   isSelected: boolean;
   onToggle: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 mb-1 ${
-        isDragging ? "bg-blue-50 shadow-lg" : "bg-white hover:bg-gray-50"
-      } border border-gray-200 select-none`}
-    >
-      {/* Drag handle */}
-      <span
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-400 text-lg"
-        aria-label="Drag to reorder"
-      >
-        ⠿
-      </span>
+    <div className="flex items-center gap-3 rounded-lg px-3 py-2 mb-1 bg-white hover:bg-gray-50 border border-gray-200 select-none">
       {/* Position */}
       <span className="text-xs font-semibold text-gray-400 w-7 shrink-0">
         {ORDINALS[index]}
@@ -67,6 +34,25 @@ function SortableTeam({
         {TEAM_FLAGS[id] && <span className="mr-1">{TEAM_FLAGS[id]}</span>}
         {id}
       </span>
+      {/* Up/down buttons */}
+      <div className="flex flex-col shrink-0">
+        <button
+          onClick={onMoveUp}
+          disabled={index === 0}
+          aria-label="Move up"
+          className="flex items-center justify-center w-10 h-5 text-gray-500 hover:text-gray-800 disabled:opacity-20 disabled:cursor-not-allowed"
+        >
+          ▲
+        </button>
+        <button
+          onClick={onMoveDown}
+          disabled={index === total - 1}
+          aria-label="Move down"
+          className="flex items-center justify-center w-10 h-5 text-gray-500 hover:text-gray-800 disabled:opacity-20 disabled:cursor-not-allowed"
+        >
+          ▼
+        </button>
+      </div>
       {/* Checkbox only for 3rd place */}
       {isThird && (
         <label className="flex items-center gap-1 cursor-pointer shrink-0">
@@ -96,38 +82,36 @@ export default function GroupCard({
   onReorder: (newTeams: string[]) => void;
   onToggleThird: () => void;
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    })
-  );
+  function moveUp(index: number) {
+    if (index === 0) return;
+    const newList = [...teams];
+    [newList[index - 1], newList[index]] = [newList[index], newList[index - 1]];
+    onReorder(newList);
+  }
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = teams.indexOf(active.id as string);
-      const newIndex = teams.indexOf(over.id as string);
-      onReorder(arrayMove(teams, oldIndex, newIndex));
-    }
+  function moveDown(index: number) {
+    if (index === teams.length - 1) return;
+    const newList = [...teams];
+    [newList[index], newList[index + 1]] = [newList[index + 1], newList[index]];
+    onReorder(newList);
   }
 
   return (
     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 shadow-sm">
       <h2 className="text-base font-bold text-gray-700 mb-3">Group {groupKey}</h2>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={teams} strategy={verticalListSortingStrategy}>
-          {teams.map((team, index) => (
-            <SortableTeam
-              key={team}
-              id={team}
-              index={index}
-              isThird={index === 2}
-              isSelected={isThirdSelected}
-              onToggle={onToggleThird}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
+      {teams.map((team, index) => (
+        <TeamRow
+          key={team}
+          id={team}
+          index={index}
+          total={teams.length}
+          isThird={index === 2}
+          isSelected={isThirdSelected}
+          onToggle={onToggleThird}
+          onMoveUp={() => moveUp(index)}
+          onMoveDown={() => moveDown(index)}
+        />
+      ))}
     </div>
   );
 }
