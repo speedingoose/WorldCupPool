@@ -46,15 +46,16 @@ export default function SubmitForm({
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-1">
-          Email <span className="text-gray-400">(optional)</span>
+          League <span className="text-red-500">*</span>
         </label>
-        <input
-          type="email"
+        <select
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="your@email.com"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
+        >
+          <option value="Consular">Consular</option>
+          <option value="CLO">CLO</option>
+        </select>
       </div>
       {error && (
         <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2">{error}</p>

@@ -14,7 +14,7 @@ export default function Home() {
     Object.fromEntries(GROUP_KEYS.map((k) => [k, false]))
   );
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("Consular");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export default function Home() {
     try {
       const payload = {
         name: name.trim(),
-        email: email.trim() || undefined,
+        email: email,
         groups,
         thirdPlaceAdvances: selections,
       };
