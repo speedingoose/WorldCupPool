@@ -35,12 +35,12 @@ function TeamRow({
         {id}
       </span>
       {/* Up/down buttons */}
-      <div className="flex flex-col shrink-0">
+      <div className="flex flex-col items-center gap-2 shrink-0">
         <button
           onClick={onMoveUp}
           disabled={index === 0}
           aria-label="Move up"
-          className="flex items-center justify-center w-10 h-5 text-gray-500 hover:text-gray-800 disabled:opacity-20 disabled:cursor-not-allowed"
+          className="flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-xl text-gray-600 hover:text-gray-900 disabled:opacity-20 disabled:cursor-not-allowed"
         >
           ▲
         </button>
@@ -48,7 +48,7 @@ function TeamRow({
           onClick={onMoveDown}
           disabled={index === total - 1}
           aria-label="Move down"
-          className="flex items-center justify-center w-10 h-5 text-gray-500 hover:text-gray-800 disabled:opacity-20 disabled:cursor-not-allowed"
+          className="flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-xl text-gray-600 hover:text-gray-900 disabled:opacity-20 disabled:cursor-not-allowed"
         >
           ▼
         </button>
