@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 30;
+
 const GROUP_KEYS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
 
 export async function POST(req: NextRequest) {
@@ -67,17 +69,49 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+
   try {
-    const upstream = await fetch(appsScriptUrl, {
+    // Google Apps Script exec URLs respond with a 302 redirect. The Fetch API
+    // specification converts a redirected POST into a GET, which means the
+    // Apps Script doPost handler never fires.  Instead we disable automatic
+    // redirect following, detect the Location header ourselves, and re-issue
+    // the POST to the final URL so the body is preserved.
+    const serialisedBody = JSON.stringify(payload);
+    const fetchOptions = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      body: serialisedBody,
+      redirect: "manual" as RequestRedirect,
+      signal: controller.signal,
+    };
+
+    let upstream = await fetch(appsScriptUrl, fetchOptions);
+
+    if (upstream.status >= 300 && upstream.status < 400) {
+      const location = upstream.headers.get("location");
+      if (location) {
+        upstream = await fetch(location, { ...fetchOptions, redirect: "follow" });
+      }
+    }
+
+    clearTimeout(timeoutId);
+
     if (!upstream.ok) {
-      return NextResponse.json({ error: "Failed to forward submission" }, { status: 502 });
+      const text = await upstream.text().catch(() => "");
+      return NextResponse.json(
+        { error: "Failed to forward submission", detail: text.slice(0, 200) },
+        { status: 502 },
+      );
     }
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to reach submission server" }, { status: 502 });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    return NextResponse.json(
+      { error: isTimeout ? "Submission server timed out" : "Failed to reach submission server" },
+      { status: 502 },
+    );
   }
 }
