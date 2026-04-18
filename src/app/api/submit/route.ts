@@ -73,14 +73,31 @@ export async function POST(req: NextRequest) {
   const timeoutId = setTimeout(() => controller.abort(), 25000);
 
   try {
-    const upstream = await fetch(appsScriptUrl, {
+    // Google Apps Script exec URLs respond with a 302 redirect. The Fetch API
+    // specification converts a redirected POST into a GET, which means the
+    // Apps Script doPost handler never fires.  Instead we disable automatic
+    // redirect following, detect the Location header ourselves, and re-issue
+    // the POST to the final URL so the body is preserved.
+    const serialisedBody = JSON.stringify(payload);
+    const fetchOptions = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      redirect: "follow",
+      body: serialisedBody,
+      redirect: "manual" as RequestRedirect,
       signal: controller.signal,
-    });
+    };
+
+    let upstream = await fetch(appsScriptUrl, fetchOptions);
+
+    if (upstream.status >= 300 && upstream.status < 400) {
+      const location = upstream.headers.get("location");
+      if (location) {
+        upstream = await fetch(location, { ...fetchOptions, redirect: "follow" });
+      }
+    }
+
     clearTimeout(timeoutId);
+
     if (!upstream.ok) {
       const text = await upstream.text().catch(() => "");
       return NextResponse.json(
