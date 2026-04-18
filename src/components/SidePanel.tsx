@@ -1,3 +1,5 @@
+import { TEAM_FLAGS } from "@/lib/groups";
+
 export default function SidePanel({
   selections,
   groups,
@@ -36,7 +38,10 @@ export default function SidePanel({
               <span className="font-semibold w-4">{key}</span>
               <span className="text-gray-300">—</span>
               {isSelected ? (
-                <span className="font-medium">{thirdTeam}</span>
+                <span className="font-medium">
+                  {TEAM_FLAGS[thirdTeam] && <span className="mr-1">{TEAM_FLAGS[thirdTeam]}</span>}
+                  {thirdTeam}
+                </span>
               ) : (
                 <span className="italic text-gray-300">not selected</span>
               )}
