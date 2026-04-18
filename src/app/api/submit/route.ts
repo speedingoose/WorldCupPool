@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 30;
+
 const GROUP_KEYS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
 
 export async function POST(req: NextRequest) {
@@ -67,17 +69,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+
   try {
     const upstream = await fetch(appsScriptUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      redirect: "follow",
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     if (!upstream.ok) {
-      return NextResponse.json({ error: "Failed to forward submission" }, { status: 502 });
+      const text = await upstream.text().catch(() => "");
+      return NextResponse.json(
+        { error: "Failed to forward submission", detail: text.slice(0, 200) },
+        { status: 502 },
+      );
     }
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to reach submission server" }, { status: 502 });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    return NextResponse.json(
+      { error: isTimeout ? "Submission server timed out" : "Failed to reach submission server" },
+      { status: 502 },
+    );
   }
 }
