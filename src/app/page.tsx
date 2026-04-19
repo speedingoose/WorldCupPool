@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { GROUPS, GROUP_KEYS } from "@/lib/groups";
+import { LEAGUES } from "@/lib/leagues";
 import GroupCard from "@/components/GroupCard";
 import SidePanel from "@/components/SidePanel";
 import SubmitForm from "@/components/SubmitForm";
@@ -14,7 +15,7 @@ export default function Home() {
     Object.fromEntries(GROUP_KEYS.map((k) => [k, false]))
   );
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("Consular");
+  const [email, setEmail] = useState(LEAGUES[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
